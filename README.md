@@ -67,3 +67,27 @@ Ejecuta ESLint en el código para encontrar y reportar posibles errores de estil
 3. Tu navegador gestionará la petición abriendo la extensión de MetaMask o cualquier wallet inyectada compatible (`window.ethereum`).
 4. Confirma la conexión. Una vez enlazada, la aplicación mostrará información como tu saldo y dirección.
 5. Puedes interactuar con la aplicación según las funcionalidades habilitadas. Cuando hayas terminado, puedes pulsar **Desconectar** para limpiar el estado de la conexión en la aplicación web.
+
+## Arquitectura y Diseño
+
+Este proyecto está construido siguiendo los principios de la **Arquitectura Hexagonal** (también conocida como arquitectura de Puertos y Adaptadores). 
+
+El objetivo principal de esta arquitectura es **separar drásticamente** la lógica de negocio puramente teórica de los detalles de infraestructura (como los renders de React, la conexión a la blockchain con MetaMask o APIs externas).
+
+### Beneficios a futuro
+
+1. **Agnosticismo tecnológico:** La lógica y estado de la aplicación no dependen explícitamente de React ni de MetaMask. Si en el futuro queremos cambiar la librería de UI o añadir soporte para múltiples wallets (WalletConnect, Phantom, etc.), podemos hacerlo construyendo nuevos adaptadores sin tocar una sola línea de la lógica de negocio o de aplicación.
+2. **Alta testabilidad:** La lógica (el núcleo de la aplicación) puede probarse de forma unitaria y ultra rápida porque no interactúa con el DOM del navegador o con la extensión de criptomonedas directamente.
+3. **Mantenibilidad robusta:** Todo código se sitúa donde debe estar. Es extremadamente fácil navegar, aislar bugs, hacer refactorizaciones o añadir funcionalidades complejas, minimizando enormemente el nivel de código acoplado (el famoso _código espagueti_).
+4. **Escalabilidad del equipo:** Al estar el código tan sumamente delimitado y ordenado, permite que varios desarrolladores pueden trabajar paralelamente en aspectos visuales (React) o integraciones Web3 y lógicas (servicios internos) sin pisarse.
+
+### Organización de carpetas
+
+El proyecto está estructurado estrictamente bajo un patrón por capas dentro del directorio principal `src/`:
+
+- **`src/domain/`** (Reglas de negocio puro): Contiene los modelos base (como `wallet.ts`) y los **contratos/interfaces** (repositorios) que determinan qué pueden hacer las dependencias externas. No importa en absoluto que React exista y su código es TypeScript puro orientado totalmente a negocio.
+- **`src/application/`** (Casos de Uso): Orquestan y estructuran acciones lógicas utilizando los repositorios del dominio (ej. `connect-wallet.ts` o `disconnect-wallet.ts`). Toman decisiones basadas en datos aislados.
+- **`src/infrastructure/`** (Detalles Técnicos): Esta es la capa externa. Se encarga de hacer funcionar las implementaciones reales. Destacan concretamente:
+  - **`adapters/`**: Son las implementaciones que resuelven los contratos impuestos por `domain`. Aquí es donde vive toda la lógica ligada a MetaMask (`metamask-adapter.ts`).
+  - **`store/`**: Mantiene en memoria y reacciona al estado global de la aplicación (`wallet-store.ts`) publicándola de un modo neutral e independiente del render. En nuestro caso, a través de variables suscritas estilo `useSyncExternalStore`.
+  - **`ui/`**: Toda la librería visual en React, los componentes aislados (`wallet-connector.tsx`) implementando estilos CSS mediante inyección con BEM. Es el lugar de visualización y de recepción de los eventos del usuario, no debe poseer "lógica de negocio profunda".
